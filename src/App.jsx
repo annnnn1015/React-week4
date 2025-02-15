@@ -28,12 +28,17 @@ function App() {
     const { value, name } = e.target;
     setAccount({ ...account, [name]: value });
   };
-  const getProducts = async () => {
+
+  // 5.將page參數加入API(預設值是1，表示第一頁)
+  const getProducts = async (page=1) => {
     try {
       const res = await axios.get(
-        `${BASE_URL}/v2/api/${API_PATH}/admin/products`
+        `${BASE_URL}/v2/api/${API_PATH}/admin/products?page=${page}`
       );
       setProducts(res.data.products);
+      // 2.取得分頁資訊
+      setPageInfo(res.data.pagination);
+      console.log(res);
     } catch (error) {
       alert("取得產品失敗");
     }
@@ -188,56 +193,82 @@ function App() {
       alert("刪除產品失敗");
     }
   };
+
+  // 1.建立分頁資訊狀態
+  const [pageInfo, setPageInfo] = useState({});
+
+  // 5.建立換頁函式，將頁碼參數帶入getProducts()
+  const handlePageChange = (page)=>{
+    getProducts(page);
+  }
+
+  // 上傳圖片時切換主圖欄位
+  const handleFileChange =async (e)=>{
+    // console.log(e);
+    // API後端有寫要用form-data格式接收（enctype="multipart/form-"data），且要在input裡面加上"name="file-to-upload"的欄位
+    // 取得輸入的檔案的值
+    const file = e.target.files[0];
+    // 建立formData物件
+    const formData = new FormData();
+    // 將檔案加入物件
+    formData.append('file-to-upload', file);
+    // 將資料上傳
+    try{
+      const res = await axios.post(`${BASE_URL}/v2/api/${API_PATH}/admin/upload`, formData)
+
+      // 將上傳的圖片URL存到狀態中
+      const uploadedImageUrl = res.data.imageUrl;
+      setTempProduct({
+        ...tempProduct,
+        imageUrl: uploadedImageUrl
+      })
+    }
+    catch(error){}
+  }
+
   return (
     <>
-      {" "}
+      
       {isAuth ? (
         <div className="container py-5">
-          {" "}
           <div className="row">
-            {" "}
             <div className="col">
-              {" "}
               <div className="d-flex justify-content-between">
-                {" "}
-                <h2>產品列表</h2>{" "}
+                <h2>產品列表</h2>
                 <button
                   onClick={() => handleOpenProductModal("create")}
                   type="button"
                   className="btn btn-primary"
                 >
                   建立新的產品
-                </button>{" "}
-              </div>{" "}
+                </button>
+              </div>
               <table className="table">
-                {" "}
                 <thead>
-                  {" "}
                   <tr>
-                    {" "}
-                    <th scope="col">產品名稱</th> <th scope="col">原價</th>{" "}
-                    <th scope="col">售價</th> <th scope="col">是否啟用</th>{" "}
-                    <th scope="col"></th>{" "}
-                  </tr>{" "}
-                </thead>{" "}
+                    <th scope="col">產品名稱</th> <th scope="col">原價</th>
+                    <th scope="col">售價</th> <th scope="col">是否啟用</th>
+                    <th scope="col"></th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {" "}
+                  
                   {products.map((product) => (
                     <tr key={product.id}>
-                      {" "}
-                      <th scope="row">{product.title}</th>{" "}
-                      <td>{product.origin_price}</td> <td>{product.price}</td>{" "}
+                      
+                      <th scope="row">{product.title}</th>
+                      <td>{product.origin_price}</td> <td>{product.price}</td>
                       <td>
                         {product.is_enabled ? (
                           <span className="text-success">啟用</span>
                         ) : (
                           <span>未啟用</span>
                         )}
-                      </td>{" "}
+                      </td>
                       <td>
-                        {" "}
+                        
                         <div className="btn-group">
-                          {" "}
+                          
                           <button
                             onClick={() =>
                               handleOpenProductModal("edit", product)
@@ -246,64 +277,64 @@ function App() {
                             className="btn btn-outline-primary btn-sm"
                           >
                             編輯
-                          </button>{" "}
+                          </button>
                           <button
                             onClick={() => handleOpenDelProductModal(product)}
                             type="button"
                             className="btn btn-outline-danger btn-sm"
                           >
                             刪除
-                          </button>{" "}
-                        </div>{" "}
-                      </td>{" "}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
-                  ))}{" "}
-                </tbody>{" "}
-              </table>{" "}
+                  ))}
+                </tbody>
+              </table>
             </div>
             <div className="d-flex justify-content-center">
               <nav>
                 <ul className="pagination">
-                  <li className="page-item">
-                    <a className="page-link" href="#">
+                  {/* 4.判斷上一頁：如果是前一頁是false就不顯示 */}
+                  {/* 助教寫法（短路運算）：${!pagiInfo.has_pre &&"disabled" } 當pagiInfo.has_pre為false時（!相反變true)，加上disabled*/}
+                  <li className={`page-item ${pageInfo.has_pre? "" :"disabled" }`}>
+                    <a className="page-link" href="#" onClick={()=>{handlePageChange(pageInfo.current_page-1)}}>
                       上一頁
                     </a>
                   </li>
+                  {/* 3.可以透過陣列的方式把全部頁碼渲染出來 */}
+                  {/* 用Array可以建立指定的陣列長度 */}
+                  { Array.from({length: pageInfo.total_pages}).map((_,index)=>{
+                    return(
+                      // 4.判斷當前頁碼：如果是當前頁碼就顯示active
+                    <li className={`page-item ${pageInfo.current_page === index+1 && "active"}`}>
+                      {/* 5.根據頁碼渲染不同頁的資料*/}
+                    <a className="page-link" href="#" onClick={()=>handlePageChange(index+1)}>
+                      {index+1}
+                      {/* 起始頁碼從0改1 */}
+                    </a>
+                  </li>)
+                  })
+                    }
 
-                  <li className="page-item">
-                    <a className="page-link" href="#">
-                      1
-                    </a>
-                  </li>
-                  <li className="page-item">
-                    <a className="page-link" href="#">
-                      2
-                    </a>
-                  </li>
-                  <li className="page-item">
-                    <a className="page-link" href="#">
-                      3
-                    </a>
-                  </li>
-
-                  <li className="page-item">
-                    <a className="page-link" href="#">
+                  <li className={`page-item  ${!pageInfo.has_next && "disabled"}`}>
+                    <a className="page-link" href="#" onClick={()=>{handlePageChange(pageInfo.current_page+1)}}>
                       下一頁
                     </a>
                   </li>
                 </ul>
               </nav>
-            </div>{" "}
-          </div>{" "}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="d-flex flex-column justify-content-center align-items-center vh-100">
-          {" "}
-          <h1 className="mb-5">請先登入</h1>{" "}
+          
+          <h1 className="mb-5">請先登入</h1>
           <form onSubmit={handleLogin} className="d-flex flex-column gap-3">
-            {" "}
+            
             <div className="form-floating mb-3">
-              {" "}
+              
               <input
                 name="username"
                 value={account.username}
@@ -312,11 +343,11 @@ function App() {
                 className="form-control"
                 id="username"
                 placeholder="name@example.com"
-              />{" "}
-              <label htmlFor="username">Email address</label>{" "}
-            </div>{" "}
+              />
+              <label htmlFor="username">Email address</label>
+            </div>
             <div className="form-floating">
-              {" "}
+              
               <input
                 name="password"
                 value={account.password}
@@ -325,12 +356,12 @@ function App() {
                 className="form-control"
                 id="password"
                 placeholder="Password"
-              />{" "}
-              <label htmlFor="password">Password</label>{" "}
-            </div>{" "}
-            <button className="btn btn-primary">登入</button>{" "}
-          </form>{" "}
-          <p className="mt-5 mb-3 text-muted">&copy; 2024~∞ - 六角學院</p>{" "}
+              />
+              <label htmlFor="password">Password</label>
+            </div>
+            <button className="btn btn-primary">登入</button>
+          </form>
+          <p className="mt-5 mb-3 text-muted">&copy; 2024~∞ - 六角學院</p>
         </div>
       )}
       <div
@@ -339,37 +370,43 @@ function App() {
         className="modal"
         style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
       >
-        {" "}
+        
         <div className="modal-dialog modal-dialog-centered modal-xl">
-          {" "}
           <div className="modal-content border-0 shadow">
-            {" "}
             <div className="modal-header border-bottom">
-              {" "}
               <h5 className="modal-title fs-4">
                 {modalMode === "create" ? "新增產品" : "編輯產品"}
-              </h5>{" "}
+              </h5>
               <button
                 onClick={handleCloseProductModal}
                 type="button"
                 className="btn-close"
                 aria-label="Close"
-              ></button>{" "}
+              ></button>
             </div>
             <div className="modal-body p-4">
-              {" "}
               <div className="row g-4">
-                {" "}
                 <div className="col-md-4">
-                  {" "}
+
+                {/* 上傳圖片 */}
+                <div className="mb-5">
+                  <label htmlFor="fileInput" className="form-label"> 圖片上傳 </label>
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png"
+                    className="form-control"
+                    id="fileInput"
+                    // 當內容變更時觸發
+                    onChange={handleFileChange}
+                  />
+                </div>
+
+                {/* 主副圖 */}
                   <div className="mb-4">
-                    {" "}
                     <label htmlFor="primary-image" className="form-label">
-                      {" "}
-                      主圖{" "}
-                    </label>{" "}
+                      主圖
+                    </label>
                     <div className="input-group">
-                      {" "}
                       <input
                         value={tempProduct.imageUrl}
                         onChange={handleModalInputChange}
@@ -378,27 +415,27 @@ function App() {
                         id="primary-image"
                         className="form-control"
                         placeholder="請輸入圖片連結"
-                      />{" "}
-                    </div>{" "}
+                      />
+                    </div>
                     <img
                       src={tempProduct.imageUrl}
                       alt={tempProduct.title}
                       className="img-fluid"
-                    />{" "}
+                    />
                   </div>
-                  {/* 副圖 */}{" "}
+                  {/* 副圖 */}
                   <div className="border border-2 border-dashed rounded-3 p-3">
-                    {" "}
+                    
                     {tempProduct.imagesUrl?.map((image, index) => (
                       <div key={index} className="mb-2">
-                        {" "}
+                        
                         <label
                           htmlFor={`imagesUrl-${index + 1}`}
                           className="form-label"
                         >
-                          {" "}
-                          副圖 {index + 1}{" "}
-                        </label>{" "}
+                          
+                          副圖 {index + 1}
+                        </label>
                         <input
                           value={image}
                           onChange={(e) => handleImageChange(e, index)}
@@ -406,18 +443,18 @@ function App() {
                           type="text"
                           placeholder={`圖片網址 ${index + 1}`}
                           className="form-control mb-2"
-                        />{" "}
+                        />
                         {image && (
                           <img
                             src={image}
                             alt={`副圖 ${index + 1}`}
                             className="img-fluid mb-2"
                           />
-                        )}{" "}
+                        )}
                       </div>
                     ))}
                     <div className="btn-group w-100">
-                      {" "}
+                      
                       {tempProduct.imagesUrl.length < 5 &&
                         tempProduct.imagesUrl[
                           tempProduct.imagesUrl.length - 1
@@ -436,18 +473,18 @@ function App() {
                         >
                           取消圖片
                         </button>
-                      )}{" "}
+                      )}
                     </div>
-                  </div>{" "}
+                  </div>
                 </div>
                 <div className="col-md-8">
-                  {" "}
+                  
                   <div className="mb-3">
-                    {" "}
+                    
                     <label htmlFor="title" className="form-label">
-                      {" "}
-                      標題{" "}
-                    </label>{" "}
+                      
+                      標題
+                    </label>
                     <input
                       value={tempProduct.title}
                       onChange={handleModalInputChange}
@@ -456,14 +493,14 @@ function App() {
                       type="text"
                       className="form-control"
                       placeholder="請輸入標題"
-                    />{" "}
+                    />
                   </div>
                   <div className="mb-3">
-                    {" "}
+                    
                     <label htmlFor="category" className="form-label">
-                      {" "}
-                      分類{" "}
-                    </label>{" "}
+                      
+                      分類
+                    </label>
                     <input
                       value={tempProduct.category}
                       onChange={handleModalInputChange}
@@ -472,14 +509,14 @@ function App() {
                       type="text"
                       className="form-control"
                       placeholder="請輸入分類"
-                    />{" "}
+                    />
                   </div>
                   <div className="mb-3">
-                    {" "}
+                    
                     <label htmlFor="unit" className="form-label">
-                      {" "}
-                      單位{" "}
-                    </label>{" "}
+                      
+                      單位
+                    </label>
                     <input
                       value={tempProduct.unit}
                       onChange={handleModalInputChange}
@@ -488,16 +525,16 @@ function App() {
                       type="text"
                       className="form-control"
                       placeholder="請輸入單位"
-                    />{" "}
+                    />
                   </div>
                   <div className="row g-3 mb-3">
-                    {" "}
+                    
                     <div className="col-6">
-                      {" "}
+                      
                       <label htmlFor="origin_price" className="form-label">
-                        {" "}
-                        原價{" "}
-                      </label>{" "}
+                        
+                        原價
+                      </label>
                       <input
                         value={tempProduct.origin_price}
                         onChange={handleModalInputChange}
@@ -506,14 +543,14 @@ function App() {
                         type="number"
                         className="form-control"
                         placeholder="請輸入原價"
-                      />{" "}
-                    </div>{" "}
+                      />
+                    </div>
                     <div className="col-6">
-                      {" "}
+                      
                       <label htmlFor="price" className="form-label">
-                        {" "}
-                        售價{" "}
-                      </label>{" "}
+                        
+                        售價
+                      </label>
                       <input
                         value={tempProduct.price}
                         onChange={handleModalInputChange}
@@ -522,15 +559,15 @@ function App() {
                         type="number"
                         className="form-control"
                         placeholder="請輸入售價"
-                      />{" "}
-                    </div>{" "}
+                      />
+                    </div>
                   </div>
                   <div className="mb-3">
-                    {" "}
+                    
                     <label htmlFor="description" className="form-label">
-                      {" "}
-                      產品描述{" "}
-                    </label>{" "}
+                      
+                      產品描述
+                    </label>
                     <textarea
                       value={tempProduct.description}
                       onChange={handleModalInputChange}
@@ -539,14 +576,14 @@ function App() {
                       className="form-control"
                       rows={4}
                       placeholder="請輸入產品描述"
-                    ></textarea>{" "}
+                    ></textarea>
                   </div>
                   <div className="mb-3">
-                    {" "}
+                    
                     <label htmlFor="content" className="form-label">
-                      {" "}
-                      說明內容{" "}
-                    </label>{" "}
+                      
+                      說明內容
+                    </label>
                     <textarea
                       value={tempProduct.content}
                       onChange={handleModalInputChange}
@@ -555,10 +592,10 @@ function App() {
                       className="form-control"
                       rows={4}
                       placeholder="請輸入說明內容"
-                    ></textarea>{" "}
+                    ></textarea>
                   </div>
                   <div className="form-check">
-                    {" "}
+                    
                     <input
                       checked={tempProduct.is_enabled}
                       onChange={handleModalInputChange}
@@ -566,36 +603,36 @@ function App() {
                       type="checkbox"
                       className="form-check-input"
                       id="isEnabled"
-                    />{" "}
+                    />
                     <label className="form-check-label" htmlFor="isEnabled">
-                      {" "}
-                      是否啟用{" "}
-                    </label>{" "}
-                  </div>{" "}
-                </div>{" "}
-              </div>{" "}
+                      
+                      是否啟用
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="modal-footer border-top bg-light">
-              {" "}
+              
               <button
                 onClick={handleCloseProductModal}
                 type="button"
                 className="btn btn-secondary"
               >
-                {" "}
-                取消{" "}
-              </button>{" "}
+                
+                取消
+              </button>
               <button
                 onClick={handleUpdateProduct}
                 type="button"
                 className="btn btn-primary"
               >
-                {" "}
-                確認{" "}
-              </button>{" "}
-            </div>{" "}
-          </div>{" "}
-        </div>{" "}
+                
+                確認
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       <div
         ref={delProductModalRef}
@@ -604,51 +641,51 @@ function App() {
         tabIndex="-1"
         style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
       >
-        {" "}
+        
         <div className="modal-dialog">
-          {" "}
+          
           <div className="modal-content">
-            {" "}
+            
             <div className="modal-header">
-              {" "}
-              <h1 className="modal-title fs-5">刪除產品</h1>{" "}
+              
+              <h1 className="modal-title fs-5">刪除產品</h1>
               <button
                 onClick={handleCloseDelProductModal}
                 type="button"
                 className="btn-close"
                 data-bs-dismiss="modal"
                 aria-label="Close"
-              ></button>{" "}
-            </div>{" "}
+              ></button>
+            </div>
             <div className="modal-body">
-              {" "}
-              你是否要刪除{" "}
+              
+              你是否要刪除
               <span className="text-danger fw-bold">
                 {tempProduct.title}
-              </span>{" "}
-            </div>{" "}
+              </span>
+            </div>
             <div className="modal-footer">
-              {" "}
+              
               <button
                 onClick={handleCloseDelProductModal}
                 type="button"
                 className="btn btn-secondary"
               >
-                {" "}
-                取消{" "}
-              </button>{" "}
+                
+                取消
+              </button>
               <button
                 onClick={handleDeleteProduct}
                 type="button"
                 className="btn btn-danger"
               >
-                {" "}
-                刪除{" "}
-              </button>{" "}
-            </div>{" "}
-          </div>{" "}
-        </div>{" "}
-      </div>{" "}
+                
+                刪除
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
